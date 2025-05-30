@@ -1,35 +1,51 @@
-const express = require('express');
-const app = express();
 require('dotenv').config();
 
+const express = require('express');
 const mongoose = require('mongoose');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
 
-const authRoutes = require('./routes/authRoutes');
-const commentRoutes = require('./routes/commentRoutes');
-const rsvpRoutes = require('./routes/rsvpRoutes');
-const eventRoutes = require('./routes/eventRoutes');
+const app = express();
 
-const MONGO_URL = process.env.MONGO_URL;
+// Routes import as an object
+const routes = {
+  user: require('./routes/authRoutes'),
+  comment: require('./routes/commentRoutes'),
+  rsvp: require('./routes/rsvpRoutes'),
+  event: require('./routes/eventRoutes'),
+};
 
-// Connect to MongoDB
-mongoose.connect(MONGO_URL)
-  .then(() => console.log("✅ Connected to database"))
-  .catch((err) => console.error("❌ Database connection failed:", err));
+const MONGO_URL = process.env.MONGO_URL;   // e.g. mongodb+srv://user:pass@cluster.mongodb.net
+const DB_NAME = process.env.DB_NAME || 'default_db_name';
 
-// CORS middleware
+async function connectDB() {
+  try {
+    await mongoose.connect(`${MONGO_URL}/${DB_NAME}`, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    console.log('✅ Connected to database:', DB_NAME);
+  } catch (err) {
+    console.error('❌ Database connection failed:', err);
+    process.exit(1); // Exit the app if DB connection fails
+  }
+}
+
+// Connect to MongoDB before starting the app
+connectDB();
+
+// Middlewares
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Routes
-app.use('/api/user', authRoutes);
-app.use('/api/comment', commentRoutes);
-app.use('/api/rsvp', rsvpRoutes);
-app.use('/api/event', eventRoutes);
+// Register all routes dynamically
+Object.entries(routes).forEach(([path, router]) => {
+  app.use(`/api/${path}`, router);
+});
 
+// Health check endpoint
 app.get('/', (req, res) => {
   res.send('✅ TechVibe backend is running!');
 });
